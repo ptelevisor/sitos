@@ -265,58 +265,200 @@
         // VOZ
         ////////////////////////////////////////
 
-        function activarVoz() {
+        ////////////////////////////////////////
+// VARIABLES VOZ CONTINUA
+////////////////////////////////////////
 
-            const SpeechRecognition =
-                window.SpeechRecognition ||
-                window.webkitSpeechRecognition;
+let recognition;
+let escuchando = false;
+let hablando = false;
 
-            if (!SpeechRecognition) {
+////////////////////////////////////////
+// ACTIVAR VOZ CONTINUA
+////////////////////////////////////////
 
-                alert("Tu navegador no soporta voz");
-                return;
-            }
+function activarVoz() {
 
-            const recognition = new SpeechRecognition();
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
 
-            recognition.lang = "es-CL";
+    if (!SpeechRecognition) {
 
-            recognition.continuous = false;
+        alert("Tu navegador no soporta voz");
+        return;
+    }
 
-            recognition.interimResults = false;
+    escuchando = true;
 
-            recognition.start();
+    recognition = new SpeechRecognition();
 
-            document.getElementById("estado").innerText =
-                "🎧 Escuchando...";
+    recognition.lang = "es-CL";
 
-            recognition.onresult = (event) => {
+    recognition.continuous = true;
 
-                const texto =
-                    event.results[0][0].transcript;
+    recognition.interimResults = false;
 
-                document.getElementById("comando").innerText =
-                    texto;
+    ////////////////////////////////////
+    // INICIAR
+    ////////////////////////////////////
 
-                procesarComando(texto.toLowerCase());
+    recognition.start();
 
-            };
+    document.getElementById("estado").innerText =
+        "🎧 Escucha continua activada";
 
-            recognition.onerror = () => {
+    ////////////////////////////////////
+    // RESULTADOS
+    ////////////////////////////////////
 
-                document.getElementById("estado").innerText =
-                    "❌ Error reconocimiento";
+    recognition.onresult = (event) => {
 
-            };
+        if (hablando) return;
 
-            recognition.onend = () => {
+        const resultado =
+            event.results[event.results.length - 1][0].transcript;
 
-                document.getElementById("estado").innerText =
-                    "✅ Voz finalizada";
+        const texto = resultado.toLowerCase().trim();
 
-            };
+        ////////////////////////////////////
+        // PALABRA CLAVE
+        ////////////////////////////////////
+
+        if (!texto.includes("asistente")) return;
+
+        ////////////////////////////////////
+        // LIMPIAR PALABRA CLAVE
+        ////////////////////////////////////
+
+        const comando = texto
+            .replace("asistente", "")
+            .trim();
+
+        document.getElementById("comando").innerText =
+            comando;
+
+        procesarComando(comando);
+
+    };
+
+    ////////////////////////////////////
+    // ERROR
+    ////////////////////////////////////
+
+    recognition.onerror = (event) => {
+
+        console.log(event.error);
+
+        document.getElementById("estado").innerText =
+            "⚠️ Reiniciando voz...";
+
+    };
+
+    ////////////////////////////////////
+    // FIN
+    ////////////////////////////////////
+
+    recognition.onend = () => {
+
+        if (escuchando && !hablando) {
+
+            setTimeout(() => {
+
+                try {
+
+                    recognition.start();
+
+                } catch (e) {
+
+                    console.log(e);
+
+                }
+
+            }, 1000);
 
         }
+
+    };
+
+}
+
+////////////////////////////////////////
+// DETENER VOZ
+////////////////////////////////////////
+
+function detenerVoz() {
+
+    escuchando = false;
+
+    if (recognition) {
+
+        recognition.stop();
+
+    }
+
+    document.getElementById("estado").innerText =
+        "🛑 Voz detenida";
+
+}
+
+////////////////////////////////////////
+// HABLAR
+////////////////////////////////////////
+
+function hablar(texto) {
+
+    hablando = true;
+
+    ////////////////////////////////////
+    // DETENER ESCUCHA
+    ////////////////////////////////////
+
+    if (recognition) {
+
+        recognition.stop();
+
+    }
+
+    const voz = new SpeechSynthesisUtterance(texto);
+
+    voz.lang = "es-CL";
+
+    voz.rate = 1;
+
+    voz.pitch = 1;
+
+    voz.onend = () => {
+
+        hablando = false;
+
+        ////////////////////////////////////
+        // REACTIVAR ESCUCHA
+        ////////////////////////////////////
+
+        if (escuchando) {
+
+            setTimeout(() => {
+
+                try {
+
+                    recognition.start();
+
+                } catch (e) {
+
+                    console.log(e);
+
+                }
+
+            }, 500);
+
+        }
+
+    };
+
+    speechSynthesis.speak(voz);
+
+}
 
         ////////////////////////////////////////
         // PROCESAR COMANDOS
