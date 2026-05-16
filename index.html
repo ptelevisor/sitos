@@ -2,81 +2,79 @@
 <html lang="es">
 
 <head>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#00b894">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Asistente Operativo Repartidor</title>
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>Asistente Operativo</title>
 
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
+
+        *{
+            box-sizing:border-box;
+            margin:0;
+            padding:0;
+            font-family:Arial,sans-serif;
         }
 
-        body {
-            background: #111;
-            color: white;
-            padding: 15px;
+        body{
+            background:#111;
+            color:white;
+            padding:15px;
         }
 
-        h1 {
-            font-size: 24px;
-            margin-bottom: 15px;
+        h1{
+            margin-bottom:15px;
+            font-size:26px;
         }
 
-        .card {
-            background: #1d1d1d;
-            border-radius: 16px;
-            padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        .card{
+            background:#1d1d1d;
+            border-radius:16px;
+            padding:15px;
+            margin-bottom:15px;
         }
 
-        .label {
-            color: #aaa;
-            font-size: 14px;
-            margin-bottom: 5px;
+        .label{
+            color:#999;
+            margin-bottom:5px;
+            font-size:14px;
         }
 
-        .value {
-            font-size: 18px;
-            font-weight: bold;
+        .value{
+            font-size:18px;
+            font-weight:bold;
         }
 
-        button {
-            width: 100%;
-            padding: 16px;
-            border: none;
-            border-radius: 14px;
-            font-size: 18px;
-            font-weight: bold;
-            background: #00b894;
-            color: white;
-            margin-top: 10px;
+        #estado{
+            margin-top:10px;
+            color:#00ffcc;
         }
 
-        button:active {
-            transform: scale(0.98);
+        button{
+            width:100%;
+            padding:16px;
+            border:none;
+            border-radius:14px;
+            background:#00b894;
+            color:white;
+            font-size:18px;
+            font-weight:bold;
+            margin-top:10px;
         }
 
-        #estado {
-            margin-top: 10px;
-            color: #00ffcc;
-            font-size: 15px;
+        .sitio{
+            background:#222;
+            border-left:5px solid #00b894;
+            padding:12px;
+            border-radius:12px;
+            margin-top:10px;
         }
 
-        .alerta {
-            margin-top: 15px;
-            padding: 12px;
-            border-radius: 12px;
-            background: #2c2c2c;
-            border-left: 6px solid orange;
-        }
     </style>
+
 </head>
 
 <body>
@@ -84,493 +82,500 @@
     <h1>🚚 Asistente Operativo</h1>
 
     <div class="card">
+        <div class="label">Estado</div>
+        <div class="value" id="estado">
+            Esperando activación...
+        </div>
+    </div>
+
+    <div class="card">
         <div class="label">Último comando</div>
-        <div class="value" id="comando">---</div>
+        <div class="value" id="comando">
+            ---
+        </div>
     </div>
 
     <div class="card">
-        <div class="label">Sitio detectado</div>
-        <div class="value" id="sitio">---</div>
+        <div class="label">Sitio actual</div>
+        <div class="value" id="sitioActual">
+            ---
+        </div>
     </div>
 
     <div class="card">
-        <div class="label">Distancia</div>
-        <div class="value" id="distancia">---</div>
+        <div class="label">Información</div>
+        <div class="value" id="info">
+            ---
+        </div>
     </div>
 
     <div class="card">
-        <div class="label">Información operativa</div>
-        <div class="value" id="info">---</div>
+
+        <div class="label">
+            Sitios guardados
+        </div>
+
+        <div id="listaSitios"></div>
+
     </div>
 
-    <button onclick="activarVoz()">
-        🎤 Activar Voz
+    <button onclick="activarAsistente()">
+        🎤 Activar Asistente
     </button>
-
-    <div id="estado"></div>
 
     <script>
 
-        ////////////////////////////////////////
-        // BASE LOCAL DE SITIOS
-        ////////////////////////////////////////
+        //////////////////////////////////////
+        // BASE LOCAL
+        //////////////////////////////////////
 
-        const sitios = [
-            {
-                nombre: "Egaña 206",
-                lat: -38.7350,
-                lng: -72.5900,
-                info: "Sin estacionamiento frecuente entre 13:00 y 15:00"
-            },
-            {
-                nombre: "Torre Centro",
-                lat: -38.7360,
-                lng: -72.5910,
-                info: "Conserjería en colación desde 13:00 a 14:00"
-            },
-            {
-                nombre: "Edificio Norte",
-                lat: -38.7345,
-                lng: -72.5895,
-                info: "Acceso por calle trasera"
-            }
-        ];
+        let sitios =
+            JSON.parse(
+                localStorage.getItem("sitios")
+            ) || [];
 
-        ////////////////////////////////////////
+        //////////////////////////////////////
         // VARIABLES
-        ////////////////////////////////////////
+        //////////////////////////////////////
 
-        let destinoActual = null;
-        let ultimaAlerta = "";
         let miLat = 0;
         let miLng = 0;
 
-        ////////////////////////////////////////
-        // HABLAR
-        ////////////////////////////////////////
+        let recognition;
 
-        function hablar(texto) {
+        let escuchando = false;
 
-            const voz = new SpeechSynthesisUtterance(texto);
+        let hablando = false;
 
-            voz.lang = "es-CL";
-            voz.rate = 1;
-            voz.pitch = 1;
+        let modoGuardar = false;
 
-            speechSynthesis.speak(voz);
-        }
+        let sitioTemporal = null;
 
-        ////////////////////////////////////////
-        // VIBRAR
-        ////////////////////////////////////////
-
-        function vibrar() {
-            if (navigator.vibrate) {
-                navigator.vibrate([300, 100, 300]);
-            }
-        }
-
-        ////////////////////////////////////////
-        // DISTANCIA ENTRE PUNTOS
-        ////////////////////////////////////////
-
-        function calcularDistancia(lat1, lon1, lat2, lon2) {
-
-            const R = 6371e3;
-
-            const φ1 = lat1 * Math.PI / 180;
-            const φ2 = lat2 * Math.PI / 180;
-
-            const Δφ = (lat2 - lat1) * Math.PI / 180;
-            const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-            const a =
-                Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                Math.cos(φ1) * Math.cos(φ2) *
-                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-            return R * c;
-        }
-
-        ////////////////////////////////////////
+        //////////////////////////////////////
         // GPS
-        ////////////////////////////////////////
+        //////////////////////////////////////
 
         navigator.geolocation.watchPosition(
 
-            (pos) => {
+            (pos)=>{
 
                 miLat = pos.coords.latitude;
                 miLng = pos.coords.longitude;
 
-                revisarDestino();
-
             },
 
-            (err) => {
+            (err)=>{
+
                 console.log(err);
+
             },
 
             {
-                enableHighAccuracy: true,
-                maximumAge: 0,
-                timeout: 5000
+                enableHighAccuracy:true,
+                maximumAge:0,
+                timeout:5000
             }
 
         );
 
-        ////////////////////////////////////////
-        // REVISAR DESTINO
-        ////////////////////////////////////////
+        //////////////////////////////////////
+        // HABLAR
+        //////////////////////////////////////
 
-        function revisarDestino() {
+        function hablar(texto){
 
-            if (!destinoActual) return;
+            hablando = true;
 
-            const dist = calcularDistancia(
-                miLat,
-                miLng,
-                destinoActual.lat,
-                destinoActual.lng
-            );
+            if(recognition){
 
-            document.getElementById("distancia").innerText =
-                Math.round(dist) + " mts";
+                recognition.stop();
 
-            if (dist < 50) {
+            }
 
-                if (ultimaAlerta !== destinoActual.nombre) {
+            const voz =
+                new SpeechSynthesisUtterance(texto);
 
-                    ultimaAlerta = destinoActual.nombre;
+            voz.lang = "es-CL";
 
-                    hablar(destinoActual.info);
+            voz.rate = 1;
 
-                    vibrar();
+            voz.pitch = 1;
 
-                    document.getElementById("info").innerText =
-                        destinoActual.info;
+            voz.onend = ()=>{
 
-                    document.getElementById("sitio").innerText =
-                        destinoActual.nombre;
+                hablando = false;
+
+                if(escuchando){
+
+                    setTimeout(()=>{
+
+                        try{
+
+                            recognition.start();
+
+                        }catch(e){}
+
+                    },500);
 
                 }
+
+            };
+
+            speechSynthesis.speak(voz);
+
+        }
+
+        //////////////////////////////////////
+        // VIBRAR
+        //////////////////////////////////////
+
+        function vibrar(){
+
+            if(navigator.vibrate){
+
+                navigator.vibrate([300,100,300]);
 
             }
 
         }
 
-        ////////////////////////////////////////
-        // VOZ
-        ////////////////////////////////////////
-
-        ////////////////////////////////////////
-// VARIABLES VOZ CONTINUA
-////////////////////////////////////////
-
-let recognition;
-let escuchando = false;
-let hablando = false;
-
-////////////////////////////////////////
-// ACTIVAR VOZ CONTINUA
-////////////////////////////////////////
-
-function activarVoz() {
-
-    const SpeechRecognition =
-        window.SpeechRecognition ||
-        window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-
-        alert("Tu navegador no soporta voz");
-        return;
-    }
-
-    escuchando = true;
-
-    recognition = new SpeechRecognition();
-
-    recognition.lang = "es-CL";
-
-    recognition.continuous = true;
-
-    recognition.interimResults = false;
-
-    ////////////////////////////////////
-    // INICIAR
-    ////////////////////////////////////
-
-    recognition.start();
-
-    document.getElementById("estado").innerText =
-        "🎧 Escucha continua activada";
-
-    ////////////////////////////////////
-    // RESULTADOS
-    ////////////////////////////////////
-
-    recognition.onresult = (event) => {
-
-        if (hablando) return;
-
-        const resultado =
-            event.results[event.results.length - 1][0].transcript;
-
-        const texto = resultado.toLowerCase().trim();
-
-        ////////////////////////////////////
-        // PALABRA CLAVE
-        ////////////////////////////////////
-
-        if (!texto.includes("asistente")) return;
-
-        ////////////////////////////////////
-        // LIMPIAR PALABRA CLAVE
-        ////////////////////////////////////
-
-        const comando = texto
-            .replace("asistente", "")
-            .trim();
-
-        document.getElementById("comando").innerText =
-            comando;
-
-        procesarComando(comando);
-
-    };
-
-    ////////////////////////////////////
-    // ERROR
-    ////////////////////////////////////
-
-    recognition.onerror = (event) => {
-
-        console.log(event.error);
-
-        document.getElementById("estado").innerText =
-            "⚠️ Reiniciando voz...";
-
-    };
-
-    ////////////////////////////////////
-    // FIN
-    ////////////////////////////////////
-
-    recognition.onend = () => {
-
-        if (escuchando && !hablando) {
-
-            setTimeout(() => {
-
-                try {
-
-                    recognition.start();
-
-                } catch (e) {
-
-                    console.log(e);
-
-                }
-
-            }, 1000);
-
-        }
-
-    };
-
-}
-
-////////////////////////////////////////
-// DETENER VOZ
-////////////////////////////////////////
-
-function detenerVoz() {
-
-    escuchando = false;
-
-    if (recognition) {
-
-        recognition.stop();
-
-    }
-
-    document.getElementById("estado").innerText =
-        "🛑 Voz detenida";
-
-}
-
-////////////////////////////////////////
-// HABLAR
-////////////////////////////////////////
-
-function hablar(texto) {
-
-    hablando = true;
-
-    ////////////////////////////////////
-    // DETENER ESCUCHA
-    ////////////////////////////////////
-
-    if (recognition) {
-
-        recognition.stop();
-
-    }
-
-    const voz = new SpeechSynthesisUtterance(texto);
-
-    voz.lang = "es-CL";
-
-    voz.rate = 1;
-
-    voz.pitch = 1;
-
-    voz.onend = () => {
-
-        hablando = false;
-
-        ////////////////////////////////////
-        // REACTIVAR ESCUCHA
-        ////////////////////////////////////
-
-        if (escuchando) {
-
-            setTimeout(() => {
-
-                try {
-
-                    recognition.start();
-
-                } catch (e) {
-
-                    console.log(e);
-
-                }
-
-            }, 500);
-
-        }
-
-    };
-
-    speechSynthesis.speak(voz);
-
-}
-
-        ////////////////////////////////////////
-        // PROCESAR COMANDOS
-        ////////////////////////////////////////
-
-        function procesarComando(texto) {
-
-            ////////////////////////////////////
-            // SITIO EGAÑA 206
-            ////////////////////////////////////
-
-            if (texto.includes("egaña")) {
-
-                const sitio = sitios.find(
-                    s => s.nombre.toLowerCase().includes("egaña")
+        //////////////////////////////////////
+        // RENDER
+        //////////////////////////////////////
+
+        function renderSitios(){
+
+            const lista =
+                document.getElementById(
+                    "listaSitios"
                 );
 
-                if (sitio) {
+            lista.innerHTML = "";
 
-                    destinoActual = sitio;
+            sitios.forEach((s)=>{
 
-                    hablar("Destino configurado");
+                const div =
+                    document.createElement("div");
 
-                    document.getElementById("sitio").innerText =
-                        sitio.nombre;
+                div.className = "sitio";
 
-                    document.getElementById("info").innerText =
-                        sitio.info;
-                }
+                div.innerHTML = `
+                    <b>${s.nombre}</b>
+                    <br>
+                    ${s.info}
+                `;
 
+                lista.appendChild(div);
+
+            });
+
+        }
+
+        renderSitios();
+
+        //////////////////////////////////////
+        // ACTIVAR ASISTENTE
+        //////////////////////////////////////
+
+        function activarAsistente(){
+
+            const SpeechRecognition =
+                window.SpeechRecognition ||
+                window.webkitSpeechRecognition;
+
+            if(!SpeechRecognition){
+
+                alert(
+                    "Navegador no soporta voz"
+                );
+
+                return;
             }
 
+            recognition =
+                new SpeechRecognition();
+
+            recognition.lang = "es-CL";
+
+            recognition.continuous = true;
+
+            recognition.interimResults = false;
+
+            escuchando = true;
+
+            recognition.start();
+
+            document.getElementById(
+                "estado"
+            ).innerText =
+                "🎧 Escucha continua";
+
             ////////////////////////////////////
-            // SITIO ADELANTE
+            // RESULTADO
             ////////////////////////////////////
 
-            else if (
-                texto.includes("adelante") ||
-                texto.includes("50 metros")
-            ) {
+            recognition.onresult = (event)=>{
 
-                let masCercano = null;
-                let mejorDistancia = 999999;
+                if(hablando) return;
 
-                sitios.forEach(s => {
+                const texto =
+                    event.results[
+                        event.results.length - 1
+                    ][0].transcript
+                    .toLowerCase()
+                    .trim();
 
-                    const d = calcularDistancia(
-                        miLat,
-                        miLng,
-                        s.lat,
-                        s.lng
-                    );
+                //////////////////////////////////
+                // ACTIVADOR
+                //////////////////////////////////
 
-                    if (d < mejorDistancia) {
+                if(
+                    !texto.includes("asistente")
+                ) return;
 
-                        mejorDistancia = d;
-                        masCercano = s;
-                    }
+                const comando =
+                    texto
+                    .replace("asistente","")
+                    .trim();
 
-                });
+                document.getElementById(
+                    "comando"
+                ).innerText = comando;
 
-                if (masCercano) {
+                procesarComando(comando);
 
-                    destinoActual = masCercano;
+            };
+
+            ////////////////////////////////////
+            // ERROR
+            ////////////////////////////////////
+
+            recognition.onerror = ()=>{
+
+                document.getElementById(
+                    "estado"
+                ).innerText =
+                    "⚠️ Reiniciando...";
+
+            };
+
+            ////////////////////////////////////
+            // FIN
+            ////////////////////////////////////
+
+            recognition.onend = ()=>{
+
+                if(
+                    escuchando &&
+                    !hablando
+                ){
+
+                    setTimeout(()=>{
+
+                        try{
+
+                            recognition.start();
+
+                        }catch(e){}
+
+                    },1000);
+
+                }
+
+            };
+
+        }
+
+        //////////////////////////////////////
+        // PROCESAR
+        //////////////////////////////////////
+
+        function procesarComando(texto){
+
+            ////////////////////////////////////
+            // GUARDAR SITIO
+            ////////////////////////////////////
+
+            if(
+                texto.startsWith(
+                    "guardar sitio"
+                )
+            ){
+
+                const nombre =
+                    texto.replace(
+                        "guardar sitio",
+                        ""
+                    ).trim();
+
+                if(!nombre){
 
                     hablar(
-                        "Sitio detectado " +
-                        masCercano.nombre
+                        "Debes indicar nombre"
                     );
 
-                    document.getElementById("sitio").innerText =
-                        masCercano.nombre;
-
-                    document.getElementById("info").innerText =
-                        masCercano.info;
-
+                    return;
                 }
 
+                sitioTemporal = {
+
+                    nombre:nombre,
+
+                    lat:miLat,
+
+                    lng:miLng,
+
+                    info:"Sin información"
+
+                };
+
+                modoGuardar = true;
+
+                document.getElementById(
+                    "sitioActual"
+                ).innerText = nombre;
+
+                hablar(
+                    "Sitio creado. Dicta una nota."
+                );
+
+                return;
+
             }
 
             ////////////////////////////////////
-            // COMANDO NO ENTENDIDO
+            // AGREGAR NOTA
             ////////////////////////////////////
 
-            else {
+            if(
+                modoGuardar &&
+                texto.startsWith("nota")
+            ){
 
-                hablar("No entendí el sitio");
+                const nota =
+                    texto.replace(
+                        "nota",
+                        ""
+                    ).trim();
+
+                sitioTemporal.info = nota;
+
+                hablar(
+                    "Nota agregada. Di guardar."
+                );
+
+                document.getElementById(
+                    "info"
+                ).innerText = nota;
+
+                return;
 
             }
+
+            ////////////////////////////////////
+            // CONFIRMAR GUARDADO
+            ////////////////////////////////////
+
+            if(
+                modoGuardar &&
+                texto === "guardar"
+            ){
+
+                sitios.push(sitioTemporal);
+
+                localStorage.setItem(
+                    "sitios",
+                    JSON.stringify(sitios)
+                );
+
+                renderSitios();
+
+                hablar(
+                    "Sitio guardado correctamente"
+                );
+
+                vibrar();
+
+                modoGuardar = false;
+
+                sitioTemporal = null;
+
+                return;
+
+            }
+
+            ////////////////////////////////////
+            // MOSTRAR SITIOS
+            ////////////////////////////////////
+
+            if(
+                texto.includes(
+                    "mostrar sitios"
+                )
+            ){
+
+                hablar(
+                    "Tienes " +
+                    sitios.length +
+                    " sitios guardados"
+                );
+
+                return;
+
+            }
+
+            ////////////////////////////////////
+            // BUSCAR SITIO
+            ////////////////////////////////////
+
+            const encontrado =
+                sitios.find(s=>
+
+                    texto.includes(
+                        s.nombre.toLowerCase()
+                    )
+
+                );
+
+            if(encontrado){
+
+                document.getElementById(
+                    "sitioActual"
+                ).innerText =
+                    encontrado.nombre;
+
+                document.getElementById(
+                    "info"
+                ).innerText =
+                    encontrado.info;
+
+                hablar(
+                    encontrado.info
+                );
+
+                vibrar();
+
+                return;
+
+            }
+
+            ////////////////////////////////////
+            // NO ENTENDIDO
+            ////////////////////////////////////
+
+            hablar(
+                "No entendí el comando"
+            );
 
         }
 
-        ////////////////////////////////////////
+        //////////////////////////////////////
         // MENSAJE INICIAL
-        ////////////////////////////////////////
+        //////////////////////////////////////
 
-        hablar("Asistente operativo iniciado");
-
-    </script>
-    <script>
-
-        if ("serviceWorker" in navigator) {
-
-            navigator.serviceWorker
-                .register("./service-worker.js")
-                .then(() => {
-
-                    console.log("PWA instalada");
-
-                });
-
-        }
+        hablar(
+            "Asistente operativo iniciado"
+        );
 
     </script>
 
